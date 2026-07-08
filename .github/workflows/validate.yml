@@ -1,0 +1,35 @@
+name: validate
+
+# Render every model .scad with OpenSCAD and check the resulting mesh is
+# watertight / 2-manifold. Validates geometry properties, not exact bytes
+# (OpenSCAD STL output isn't deterministic enough to byte-compare).
+
+on:
+  pull_request:
+    paths:
+      - "**.scad"
+      - "**.stl"
+      - "tools/**"
+      - "requirements-dev.txt"
+      - ".github/workflows/validate.yml"
+  workflow_dispatch:
+
+jobs:
+  render-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.x"
+
+      - name: Install OpenSCAD + mesh validator
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends openscad xvfb
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Render + validate models
+        run: xvfb-run -a tools/render.sh

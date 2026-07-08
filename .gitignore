@@ -1,0 +1,29 @@
+# claude-project-kit — managed block START
+# Local-only Claude Code state — installed globally via install-commands.sh
+# or scoped per-project, but never committed to the source-code repo.
+.claude/
+
+# macOS
+.DS_Store
+._*
+.AppleDouble
+.LSOverride
+
+# Editors / IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+# claude-project-kit — managed block END
+
+# Rendered build artifacts (STLs are rendered into build/ by tools/render.sh)
+build/
+# Release artifacts
+dist/
+# Python venv for the mesh validator
+.venv/
+__pycache__/
+
+# STLs are release artifacts, not committed (render from source)
+*.stl
