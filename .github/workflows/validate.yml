@@ -5,6 +5,14 @@ name: validate
 # (OpenSCAD STL output isn't deterministic enough to byte-compare).
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - "**.scad"
+      - "**.stl"
+      - "tools/**"
+      - "requirements-dev.txt"
+      - ".github/workflows/validate.yml"
   pull_request:
     paths:
       - "**.scad"
