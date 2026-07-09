@@ -71,23 +71,56 @@ CLEARANCE     = 0.00;  // [-0.20:0.01:0.20] mm global horizontal compensation.
 ARMS_PER_CELL = 4;     // [2, 4] one per side. 2 = opposing pair (softer insert).
 
 // ---------------------------------------------------------------------------
-// Geometry
+// Geometry — Phase 2 first cut
 // ---------------------------------------------------------------------------
+//
+// Flexure orientation (the design fork — see working-folder implementation.md §2.1):
+// print is FLAT / plate-down, so layers are XY planes stacked in Z and the weak
+// direction is Z (delamination). The arm's working flex is RADIAL (the foot cams
+// each tip outward on the way in, then the tip springs back under the chamfer).
+// For that flex to load the print in-plane instead of peeling layers apart, the
+// beam must run TANGENTIALLY (along the wall, in XY) and flex radially — a radial
+// push then becomes transverse bending with axial tension staying in the layer
+// plane. A vertical cantilever rooted at the floor would put tension along Z and
+// delaminate. So: tangential flexure, not a vertical finger.
+//
+// Topology: a blade spanning ARM_WIDTH along the wall, anchored at both tangential
+// ends, bowing radially at mid-span into a relief pocket behind it. NOTE this made
+// ARM_WIDTH the flexure span (governs stiffness, ~1/span^3) and left ARM_LENGTH
+// without a role under this topology — flagged for review, see implementation.md.
 
-// One cantilever latch, positioned at the +Y wall of a cell, tip pointing -Y.
-// Phase 2 — TODO. The arm must:
-//   1. live in a relief pocket cut through the socket wall (so it can flex out)
-//   2. present a lead-in ramp below FOOT_VERT_Z0 for the foot to cam against
-//   3. present a flat (or slightly back-angled) catch face at FOOT_VERT_Z1
-//   4. flex across layer lines, not along them — see README print orientation
+// Local +Y frame (clickfinity_baseplate rotates copies to the other walls):
+_ARM_Y_IN  = FOOT_VERT_HW - ARM_ENGAGE + CLEARANCE;  // inner face — protrudes under the foot chamfer
+_ARM_Y_OUT = _ARM_Y_IN + ARM_THICKNESS;              // outer (flexing) face
+_ARM_Z_TOP = FOOT_VERT_Z1;                           // 3.80 — the catch shelf (top face)
+_ARM_Z_BOT = FOOT_SEAT_Z + 0.4;                      // 1.60 — blade base, clears the seat
+_ARM_LEAD  = FOOT_VERT_Z0;                           // 2.00 — inner face ramps outward below this
+
+// One tangential flexure latch at the +Y cell wall, catch facing -Y (cell center).
+// Spans ARM_WIDTH along the wall (X), flexes radially (Y) into its relief pocket.
+// The top face at _ARM_Z_TOP is the catch: the foot's top-chamfer underside bears
+// down on it when the bin is pulled up. Below _ARM_LEAD the inner face ramps out by
+// ARM_ENGAGE so the descending foot cams the arm aside instead of butting it.
 module click_arm() {
-    // intentionally empty until Phase 2
+    yc = (_ARM_Y_IN + _ARM_Y_OUT) / 2;
+    hull() {
+        // full-thickness upper band: lead-in height → catch shelf
+        translate([0, yc, (_ARM_LEAD + _ARM_Z_TOP) / 2])
+            cube([ARM_WIDTH, ARM_THICKNESS, _ARM_Z_TOP - _ARM_LEAD], center = true);
+        // retracted base: inner face pulled out by ARM_ENGAGE → forms the lead-in ramp
+        translate([0, yc + ARM_ENGAGE, _ARM_Z_BOT + 0.01])
+            cube([ARM_WIDTH, ARM_THICKNESS, 0.02], center = true);
+    }
 }
 
-// Relief pocket the arm flexes into. Cut from the plate before the arm is added.
-// Phase 2 — TODO.
+// Relief pocket behind the blade so its span can bow outward (+Y). Cut from the
+// plate before the arm is unioned in. Sits between the outer arm face and the
+// plate's outer wall — leaves that wall and the floor intact, so the plate stays
+// watertight.
 module _arm_relief() {
-    // intentionally empty until Phase 2
+    gap = ARM_ENGAGE + 0.5;   // flex room + margin
+    translate([0, _ARM_Y_OUT + gap / 2, (_ARM_Z_BOT + _ARM_Z_TOP) / 2])
+        cube([ARM_WIDTH + 0.8, gap, (_ARM_Z_TOP - _ARM_Z_BOT) + 1.0], center = true);
 }
 
 // A full baseplate: standard Gridfinity sockets, plus a latch on each cell wall.
