@@ -16,7 +16,7 @@ GRID_X = 4;   // [1:12]
 GRID_Y = 4;   // [1:12]
 
 /* [Latch arms] */
-ENABLE_ARMS = false;  // Phase 2 — no arm geometry yet; renders a plain baseplate.
+ENABLE_ARMS = true;   // full-height tongue latches. Set false for a plain baseplate.
 
 /* [Quality] */
 $fn = 48;     // [24:8:96]
