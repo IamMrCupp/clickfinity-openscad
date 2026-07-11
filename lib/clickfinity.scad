@@ -54,20 +54,25 @@ SOCKET_HW    = GF / 2 - _C_TOP;              // 18.85 — socket half-width, sam
 // Tunables — the click lives or dies here. Tune against a printed 1x1_test.
 // ---------------------------------------------------------------------------
 
-ARM_ENGAGE = 0.90;  // [0.40:0.05:1.40] mm the catch reaches past the foot wall.
+ARM_ENGAGE = 0.65;  // [0.40:0.05:1.40] mm the catch reaches past the foot wall.
                     //   Too low  → bin lifts out. Too high → won't seat.
-                    //   The catch must retract this far for the foot to pass.
-ARM_THK    = 1.60;  // [1.00:0.10:2.60] mm tongue thickness, radial. Stiffness
-                    //   goes as thickness^3 — the coarse knob. Reference ≈2.0.
-ARM_LEN    = 8.00;  // [4.00:0.50:12.00] mm tongue length along the wall (the
-                    //   cantilever span). Stiffness ~1/len^3 — the fine knob.
-                    //   Longer = softer. Reference tongue ≈3.3 mm (very stiff).
+                    //   The tongue must flex THIS far every insertion — it drives
+                    //   root stress directly (see the stress echo). Keep it modest.
+ARM_THK    = 1.30;  // [1.00:0.10:2.60] mm tongue thickness, radial. Root stress
+                    //   ~ thickness, so THICKER SNAPS SOONER at fixed deflection.
+                    //   Coarse grip knob (force ~ thickness^3), but watch stress.
+ARM_LEN    = 11.0;  // [6.00:0.50:16.00] mm tongue length along the wall (the
+                    //   cantilever span). Root stress ~ 1/len^2 and force ~1/len^3,
+                    //   so LONGER = softer AND lower stress. The safety knob.
 ARM_SLOT   = 1.00;  // [0.60:0.10:2.00] mm outboard flex gap the tongue swings
                     //   into. Must exceed ARM_ENGAGE so the catch can fully clear.
 ARM_SKIN   = 0.80;  // [0.60:0.10:2.00] mm outer perimeter wall kept beyond the
                     //   slot. Structure; keep >= 2 line widths.
 ARM_ROOT   = 1.50;  // [1.00:0.25:3.00] mm width of the rooted (hinge) end where
                     //   the tongue stays fused to the wall.
+ARM_FILLET = 0.40;  // [0.00:0.05:0.60] mm radius blending the tongue into the
+                    //   wall at the root — softens the stress concentration that
+                    //   cracks a sharp root corner. Must stay < ARM_SLOT/2.
 CLEARANCE  = 0.00;  // [-0.20:0.01:0.20] mm global horizontal compensation.
                     //   Positive = looser. Printer flow/elephant-foot lands here.
 
@@ -128,11 +133,16 @@ _ARM_E_PETG = 2000;
 _ARM_I = BP_H * pow(ARM_THK, 3) / 12;
 _ARM_K = 3 * _ARM_E_PETG * _ARM_I / pow(ARM_LEN, 3);
 _ARM_F = _ARM_K * ARM_ENGAGE;
+// Peak bending stress at the root for the imposed deflection: sigma = 1.5·E·t·δ/L².
+// THIS is what fractures a too-stiff tongue (the v3 8×1.6 mm/0.9 mm arm hit ~67
+// MPa and snapped on the first click). Keep it well under PETG's ~45 MPa break —
+// aim <25 for fatigue margin. Independent of height; only t, δ, L move it.
+_ARM_STRESS = 1.5 * _ARM_E_PETG * ARM_THK * ARM_ENGAGE / pow(ARM_LEN, 2);
 echo(str("[clickfinity] tongue ", ARM_LEN, " x ", ARM_THK,
-         " mm -> ", round(_ARM_K*10)/10, " N/mm; ",
-         round(_ARM_F*10)/10, " N per arm; ",
-         round(_ARM_F*ARMS_PER_CELL*10)/10, " N per cell",
-         (_ARM_F > 45) ? "  <<< STIFF - lengthen ARM_LEN or thin ARM_THK" : ""));
+         " mm -> ", round(_ARM_F*10)/10, " N/arm, ",
+         round(_ARM_F*ARMS_PER_CELL*10)/10, " N/cell; root stress ~",
+         round(_ARM_STRESS*10)/10, " MPa",
+         (_ARM_STRESS > 30) ? "  <<< WILL CRACK - lengthen ARM_LEN / thin ARM_THK / lower ARM_ENGAGE" : ""));
 
 // One full-height tongue at the +Y wall, extruded along X (tangential).
 module click_arm() {
@@ -148,9 +158,12 @@ module _arm_relief() {
     e = 0.02;  // overlap so no cut face lands coplanar with a kept face
     len_free = ARM_LEN - ARM_ROOT + ARM_SLOT;  // cut length: everything but the root
     // outboard leg: frees the swing side. Starts e inside the tongue's outboard
-    // face to avoid a coincident plane.
-    translate([-ARM_LEN/2 - ARM_SLOT, _T_OUT - e, -1])
-        cube([len_free, (_SLOT_O - _T_OUT) + e, _THRU + 1]);
+    // face to avoid a coincident plane. Corners rounded by ARM_FILLET so the
+    // tongue blends into the wall at the root instead of a sharp stress riser.
+    translate([0, 0, -1]) linear_extrude(_THRU + 1)
+        offset(ARM_FILLET) offset(-ARM_FILLET)
+            translate([-ARM_LEN/2 - ARM_SLOT, _T_OUT - e])
+                square([len_free, (_SLOT_O - _T_OUT) + e]);
     // free-end leg: frees the -X tip from the corner wall
     translate([-ARM_LEN/2 - ARM_SLOT, _T_IN - 0.5, -1])
         cube([ARM_SLOT + e, _SKIN_I - (_T_IN - 0.5), _THRU + 1]);
