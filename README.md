@@ -1,9 +1,8 @@
 # Clickfinity — OpenSCAD
 
-A parametric, open-source generator for **magnet-free Gridfinity baseplates** — the kind that hold standard 42 mm bins with flexible latch arms instead of magnets.
+A parametric, open-source generator for **magnet-free Gridfinity baseplates** — the kind that hold standard 42 mm bins with flexible latch tongues instead of magnets.
 
-> **Status: work in progress. Nothing clicks yet.**
-> Phase 1 (grid + spec) is done — the generator produces a valid, watertight Gridfinity baseplate at any size. The latch arms are stubs. Don't print this expecting it to grip a bin.
+> **Status: it clicks.** The generator produces a shallow baseplate whose spring tongues catch a standard Gridfinity bin foot — bin seats, holds, and releases, no magnets. Validated on a 2×2 PETG print. Grip is moderate and fully tunable; multi-plate joining (Phase 4) is still to come.
 
 ## Why this exists
 
@@ -13,15 +12,15 @@ The magnet-free alternative is **Clickfinity** (jerrymk → NoWarrenty → John 
 
 So: no parametric, open-source, magnet-free baseplate generator exists. **That's the gap.** This fills it.
 
-This is a clean-room reimplementation from the published Gridfinity dimensional spec and physical measurement. No geometry is ported from the upstream Fusion files.
+Clean-room reimplementation from the published Gridfinity dimensional spec and physical measurement of a public CLICKbase derivative ([Printables 719455](https://www.printables.com/model/719455-gridfinity-clickfinity-baseplate-w-connectors)). The mechanism is reimplemented from how it *functions*; no geometry is ported from the upstream Fusion files.
 
 ## Use it
 
 ```bash
-openscad -o baseplate.stl clickfinity.scad
+openscad -o baseplate.stl clickfinity.scad     # grid size at the top of the file
 ```
 
-Grid size lives at the top of [`clickfinity.scad`](clickfinity.scad); the arm tuning knobs live in [`lib/clickfinity.scad`](lib/clickfinity.scad). Both are laid out for OpenSCAD's Customizer panel.
+Grid size (`GRID_X`, `GRID_Y`) lives at the top of [`clickfinity.scad`](clickfinity.scad); every latch knob lives in [`lib/clickfinity.scad`](lib/clickfinity.scad). Both are laid out for OpenSCAD's Customizer panel. At render time the console **echoes the estimated grip force and root stress** — watch it.
 
 Render and validate everything (watertight / 2-manifold, via trimesh):
 
@@ -30,48 +29,50 @@ pip install -r requirements-dev.txt
 tools/render.sh
 ```
 
+## How the latch works
+
+Each cell wall carries a **full-height cantilever tongue** — a solid spring rooted to the wall at one end. A bin foot descending into the socket cams the tongue's catch outward; once the foot passes, the tongue springs back over it. Three deliberate choices make this print and last:
+
+- **Shallow plate (~4 mm).** A full-depth Gridfinity socket flares wide open at the top to receive the bin foot's flared rim — and that flare fights the latch. A shallow plate keeps the flare *above* the plate, so the socket walls stay straight and the latch has room. (Bins sit slightly prouder than in a deep magnet baseplate; the click holds them, not a deep pocket.)
+- **Localized catch.** The catch is a small bump on the tongue's *compliant free end*, only in the mid-height band where the foot's vertical wall sits — never on the rigid root (which can't retract → would jam the bin) and never full height (which would push a seated bin back out).
+- **In-plane flex.** The tongue swings about a *vertical* hinge, so its bending stays in the print plane. It prints as a solid blade on the bed — no bridges — and flexing doesn't peel layers apart.
+
 ## Print it in PETG
 
-**Not PLA.** The arms sit under constant spring tension, and PLA creeps — it'll relax and lose grip within weeks. PETG, ABS, ASA, or nylon.
+**Not PLA.** The tongues sit under constant spring tension, and PLA creeps — it relaxes and loses grip within weeks. PETG, ABS, ASA, or nylon.
 
 | Setting | Value |
 |---|---|
 | Material | PETG / ABS / ASA / nylon |
-| Speed | ~50 mm/s (CLICKbase's note — slower walls print better arms) |
-| Orientation | Flat, plate-down. The arms flex *across* layer lines, not along them. |
+| Orientation | Flat, plate-down (as exported). Prints solid, no bridges. |
 | Supports | None |
-
-Print orientation isn't cosmetic here. An arm that flexes along its layer lines delaminates instead of springing.
+| Walls | Arachne wall generator; ≥ 2 wall loops (the tongues are thin) |
+| Cooling | Modest — the tongues need layer adhesion. Don't blast overhang/bridge fan; on PETG that under-bonds the spring. |
 
 ## Tuning
 
-The click is a tolerance problem, and your printer's tolerances aren't mine. **Print [`1x1_test.scad`](1x1_test.scad), not a full plate** — a single cell takes minutes, so an iteration costs minutes.
+The click is a tolerance-and-stiffness problem, and your printer isn't mine. **Print a test tile, not a full plate** — [`2x2_test.scad`](2x2_test.scad) is the one to tune against (its interior walls are ~4.3 mm, room for a proper latch; a 1×1's perimeter walls are only 2.15 mm, the hardest case). [`1x1_test.scad`](1x1_test.scad) is faster if you only care about click feel.
 
-Change **one** parameter, print, click a real bin in, record the result. Then:
+Change **one** knob, print, click a real bin in, record the result. The render echo reports **grip (N/cell)** and **root stress (MPa)** — the stress is what fractures a tongue, so keep it well under PETG's ~45 MPa break (aim < 30).
 
 | Symptom | Fix |
 |---|---|
-| Won't seat / too tight | Raise `CLEARANCE`, or lower `ARM_ENGAGE` |
-| Bin falls out / lifts free | Lower `CLEARANCE`, or raise `ARM_ENGAGE` |
-| Arms snap, or insertion needs a hammer | Lower `ARM_THICKNESS`, or raise `ARM_LENGTH` |
-| Arms feel mushy, no click | Raise `ARM_THICKNESS`, or lower `ARM_LENGTH` |
+| Bin won't seat / pushed out at the corners | Lower `ARM_ENGAGE`; check `ARM_SLOT` > `ARM_ENGAGE` |
+| Bin falls out / lifts too easily | Raise `ARM_ENGAGE`, or `ARM_THK` — **watch the stress echo** |
+| A tongue cracks / snaps | Lengthen `ARM_LEN`, thin `ARM_THK`, or lower `ARM_ENGAGE` — all cut root stress |
+| Grip too soft but stress already near 30 | Raise `ARM_THK` **and** `ARM_LEN` together (more force at the same stress) |
+| First layer of a tongue welds to the floor | Bin won't seat; the base-freeing slot isn't clearing — raise `FLOOR` or check the print |
 
-Arm stiffness goes as thickness³ and as 1/length³. Thickness is the coarse knob; length is the fine one. `CLEARANCE` is where your printer's elephant-foot and flow calibration land — ±0.10–0.15 mm is the usual range.
-
-## Where the latch grabs
-
-Worth knowing before you touch the arm geometry: a Gridfinity bin's foot widens as it rises, so **every overhang on it faces downward.** There's exactly one re-entrant feature a latch can hook — the underside of the foot's top chamfer. Pull the bin up, that surface presses down on the arm tip. That's the click, and there's no second option.
-
-The derivation is commented in [`lib/clickfinity.scad`](lib/clickfinity.scad).
+Root stress scales as `thickness × engagement / length²`, grip as `thickness³ / length³`. So **length is the safety knob** (longer = softer *and* lower stress), thickness is the coarse grip knob (but it raises stress), and `ARM_ENGAGE` is how far the catch reaches — the direct grip/deflection trade. `CLEARANCE` absorbs your printer's flow/elephant-foot (±0.10–0.15 mm).
 
 ## Compatibility
 
-Accepts any standard 42 mm Gridfinity bin. The spec constants — 42 mm pitch, 41.5 mm foot, 0.8/1.8/2.15 mm chamfer stack — are in [`lib/gridfinity.scad`](lib/gridfinity.scad), verified against printed bins.
+Accepts any standard 42 mm Gridfinity bin. The foot spec — 42 mm pitch, 41.5 mm foot, the 0.8/1.8/2.15 mm chamfer stack — is in [`lib/gridfinity.scad`](lib/gridfinity.scad), verified against printed bins. The latch grabs the foot's vertical wall band; the foot's flared top sits proud above the shallow plate.
 
 ## Credit
 
 - **Gridfinity** — [Zack Freedman](https://www.youtube.com/@ZackFreedman), original spec.
-- **Clickfinity / CLICKbase** — jerrymk, NoWarrenty, and John Hall, who worked out that spring arms beat magnets. The concept is theirs; this code is not a port of theirs.
+- **Clickfinity / CLICKbase** — jerrymk, NoWarrenty, and John Hall, who worked out that spring arms beat magnets. The concept is theirs; this code is not a port of theirs. The latch geometry here was reverse-engineered from a public CLICKbase derivative ([Printables 719455](https://www.printables.com/model/719455-gridfinity-clickfinity-baseplate-w-connectors) by James Boone) — measured, then reimplemented parametrically.
 - **[`gridfinity-rebuilt-openscad`](https://github.com/kennetek/gridfinity-rebuilt-openscad)** — kennetek. The reference implementation for the magnet/screw side, and a good cross-check on spec constants.
 
 ## License
