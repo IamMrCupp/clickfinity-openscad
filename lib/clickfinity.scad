@@ -54,6 +54,18 @@ LEADIN  = 1.20;   // [0.60:0.10:2.00] mm top opening chamfer — guides the foot
                   //   AND clears the start of the foot's flare at the rim.
 
 // ---------------------------------------------------------------------------
+// Edge joining (Phase 4) — built-in dovetails, no loose parts.
+// ---------------------------------------------------------------------------
+// +X and +Y edges get a MALE dovetail per cell; -X and -Y edges get the matching
+// FEMALE slot. Butt two plates edge-to-edge and slide along the shared edge to
+// lock them (the widening dovetail can't pull apart in-plane). Opt-in.
+JOIN        = false;  // enable edge dovetails
+JOIN_DEPTH  = 3.00;   // [2.00:0.50:5.00] mm how far the tab protrudes / slot cuts
+JOIN_WB     = 5.00;   // [3.00:0.50:8.00] mm dovetail width at the plate edge (neck)
+JOIN_WT     = 8.00;   // [5.00:0.50:11.00] mm width at the tip (wider = locks harder)
+JOIN_CLEAR  = 0.20;   // [0.05:0.05:0.40] mm slop in the female slot — tune to print
+
+// ---------------------------------------------------------------------------
 // Latch tunables — tune against a printed tile. Watch the root-stress echo.
 // ---------------------------------------------------------------------------
 ARM_ENGAGE = 0.60;  // [0.40:0.05:1.30] mm catch reach past the foot wall = the
@@ -170,16 +182,37 @@ module _per_wall(nx, ny) {
         translate([(ix-(nx-1)/2)*GF, (iy-(ny-1)/2)*GF, 0])
             for (a=[0:ARMS_PER_CELL-1]) rotate([0,0,a*360/ARMS_PER_CELL]) children();
 }
+// A dovetail in the XY plane: neck (WB) at the edge, widening to WT at the tip.
+// `over` extends the base back into the plate so a male tab fuses / a female
+// slot cuts cleanly through the edge. Extruded full plate height.
+module _dovetail(wb, wt, depth, over) {
+    linear_extrude(PLATE_H + (over > 0 ? 0 : 2))
+        polygon([[-over,-wb/2], [0,-wb/2], [depth,-wt/2],
+                 [depth,wt/2], [0,wb/2], [-over,wb/2]]);
+}
+// Male tabs on +X/+Y, female slots on -X/-Y. Females are the same dovetail
+// grown by JOIN_CLEAR and cut full-depth (z -1 .. PLATE_H+1).
+module _join_males(nx, ny) {
+    ex = nx*GF/2; ey = ny*GF/2;
+    for (iy=[0:ny-1]) translate([ex, (iy-(ny-1)/2)*GF, 0]) _dovetail(JOIN_WB, JOIN_WT, JOIN_DEPTH, 1);
+    for (ix=[0:nx-1]) translate([(ix-(nx-1)/2)*GF, ey, 0]) rotate([0,0,90]) _dovetail(JOIN_WB, JOIN_WT, JOIN_DEPTH, 1);
+}
+module _join_females(nx, ny) {
+    ex = nx*GF/2; ey = ny*GF/2; c = JOIN_CLEAR;
+    for (iy=[0:ny-1]) translate([-ex, (iy-(ny-1)/2)*GF, -1]) _dovetail(JOIN_WB+c, JOIN_WT+c, JOIN_DEPTH+0.3, 1);
+    for (ix=[0:nx-1]) translate([(ix-(nx-1)/2)*GF, -ey, -1]) rotate([0,0,90]) _dovetail(JOIN_WB+c, JOIN_WT+c, JOIN_DEPTH+0.3, 1);
+}
 module clickfinity_baseplate(nx, ny, arms = true) {
     difference() {
         union() {
             _shallow_base(nx, ny);
             if (arms) _per_wall(nx, ny) click_arm();
+            if (JOIN) _join_males(nx, ny);
         }
         if (arms) _per_wall(nx, ny) _arm_relief();
+        if (JOIN) _join_females(nx, ny);
     }
 }
 
-module connector_clip() {
-    // intentionally empty until Phase 4
-}
+// The old separate-clip joiner is superseded by built-in dovetails (JOIN).
+module connector_clip() { }
