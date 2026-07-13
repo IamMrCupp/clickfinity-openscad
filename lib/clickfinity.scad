@@ -1,224 +1,185 @@
-// clickfinity.scad — magnet-free Gridfinity baseplate with flexible latch arms.
+// clickfinity.scad — magnet-free Gridfinity baseplate with flexible latch tongues.
 //
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Aaron Cupp
 //
-// Clean-room reimplementation of the Clickfinity *concept* (jerrymk →
-// NoWarrenty → John Hall's CLICKbase) from the published Gridfinity spec and
-// physical measurement. No geometry is ported from the upstream Fusion 360
-// sources.
+// Clean-room reimplementation of the Clickfinity concept (jerrymk → NoWarrenty
+// → John Hall's CLICKbase) from the published Gridfinity spec and physical
+// measurement of the CLICKbase-derivative (Printables 719455). No geometry is
+// ported from the upstream Fusion 360 sources.
 //
-//   clickfinity_baseplate(nx, ny)  — tiled baseplate with latch arms
-//   click_arm()                    — one cantilever latch  (Phase 2 — TODO)
+//   clickfinity_baseplate(nx, ny)  — tiled SHALLOW baseplate with latch tongues
+//   click_arm()                    — one full-height cantilever tongue
 //   connector_clip()               — plate-to-plate joiner (Phase 4 — TODO)
 //
-// PRINT IN PETG / ABS / ASA / NYLON — **NOT PLA.** The arms sit under constant
-// spring tension; PLA creeps and loses grip within weeks.
+// PRINT IN PETG / ABS / ASA / NYLON — **NOT PLA.** The tongues sit under
+// constant spring tension; PLA creeps and loses grip within weeks.
+//
+// DESIGN NOTES (hard-won across the print loop):
+//  * SHALLOW plate (like the reference). A full-depth Gridfinity socket flares
+//    wide open at the top to receive the bin foot's flared rim — that flare eats
+//    the wall where the latch needs material and collides with a full-height
+//    tongue. A ~4 mm plate keeps the foot's flare ABOVE the plate, so the socket
+//    walls stay straight and the latch has room.
+//  * LOCALIZED catch. The catch is a small bump on the tongue's compliant FREE
+//    END, in the mid-height band where the foot's vertical wall sits — NOT along
+//    the rigid root (which can't retract → jams the bin) and NOT full height
+//    (which pushes the seated bin back out). Root + rest stay flush with the
+//    socket wall.
+//  * Full-height solid tongue, freed on 3 sides by a slot cut through the floor
+//    (outboard + free end + base) so it swings about a vertical hinge at the one
+//    rooted end: in-plane bending, no delamination, prints solid on the bed.
 
-// `include`, not `use` — we need gridfinity.scad's spec constants (GF, BIN_SZ,
-// _C_TOP, _BP_FLOOR), and `use` imports only modules/functions. It carries no
-// top-level geometry, so including it is side-effect free.
+// `include`, not `use` — we need gridfinity.scad's spec constants.
 include <gridfinity.scad>
 
 // ---------------------------------------------------------------------------
-// Where the latch grabs — the one place it can
+// Spec anchors (from the bin foot, per lib/gridfinity.scad)
 // ---------------------------------------------------------------------------
-//
-// A Gridfinity bin's foot is a stack of three bands, widening as it rises
-// (all insets measured from the 41.5 mm foot square, per lib/gridfinity.scad):
-//
-//   foot z 0.00 → 0.80   bottom chamfer, inset 2.95 → 2.15   (lead-in)
-//   foot z 0.80 → 2.60   vertical wall,  inset 2.15          (the cam surface)
-//   foot z 2.60 → 4.75   top chamfer,    inset 2.15 → 0      (the catch)
-//
-// Every overhang on that foot faces *downward*. So there is exactly one
-// re-entrant feature a latch can hook: the **underside of the top chamfer**.
-// Pull the bin up and that surface presses down on the arm tip. That is the
-// click. There is no second option — the foot offers nothing else to grab.
-//
-// The bin foot bottoms out on the baseplate floor (BP_FLOOR = 1.2), so in
-// plate coordinates (z = 0 at the plate's underside):
-
-FOOT_SEAT_Z  = _BP_FLOOR;                    // 1.20 — foot's bottom face
-FOOT_VERT_Z0 = FOOT_SEAT_Z + 0.8;            // 2.00 — cam surface starts
-FOOT_VERT_Z1 = FOOT_SEAT_Z + 2.6;            // 3.80 — catch edge: arm tip goes here
-FOOT_VERT_HW = BIN_SZ / 2 - _C_TOP;          // 18.60 — foot half-width at the cam
-SOCKET_HW    = GF / 2 - _C_TOP;              // 18.85 — socket half-width, same height
-//
-// The 0.25 mm gap between those two is the stock clearance. An arm tip must
-// reach *past* the foot wall to hook the chamfer above it — so the tip's inner
-// face lands at FOOT_VERT_HW - ARM_ENGAGE, and the arm deflects by ARM_ENGAGE
-// as the foot's lead-in chamfer cams it outward on the way in.
+// Foot: z 0.0–0.8 bottom chamfer (hw 17.8→18.6), z 0.8–2.6 vertical wall (hw
+// 18.6), z 2.6–4.75 top chamfer (hw 18.6→20.75, the flare). The latch grabs the
+// vertical band; the flare sits ABOVE this shallow plate.
+FOOT_VERT_HW = BIN_SZ/2 - _C_TOP;   // 18.60 — foot half-width at the vertical wall
+SOCK_HW      = GF/2 - _C_TOP;       // 18.85 — socket wall (0.25 clearance on the foot)
+SOCK_R       = 1.85;                // socket corner radius (foot corner + clearance)
 
 // ---------------------------------------------------------------------------
-// Tunables — the click lives or dies here. Tune against a printed 1x1_test.
+// Plate
 // ---------------------------------------------------------------------------
-
-ARM_ENGAGE    = 0.60;  // [0.35:0.05:1.00] mm the tip overlaps the foot wall.
-                       //   Too low  → bin lifts out / falls out.
-                       //   Too high → won't seat, or the arm snaps.
-                       //   ALSO equals the arm's deflection during insertion.
-ARM_THICKNESS = 0.80;  // [0.60:0.05:2.00] mm blade thickness, radial. Stiffness
-                       //   goes as thickness^3 — this is the coarse knob.
-                       //   Keep it a clean multiple of your nozzle width.
-ARM_LENGTH    = 18.00; // [8.00:0.50:24.00] mm FREE SPAN along the wall — the
-                       //   distance between the blade's two rooted ends.
-                       //   Stiffness goes as 1/span^3 — the fine knob.
-                       //   Longer = softer. A fixed-fixed span is ~8x stiffer
-                       //   than a cantilever of equal length, so err LONG:
-                       //   a 9 mm span at 1.2 mm thick needs ~650 N to seat a
-                       //   bin. Watch the force echoed at render time.
-ARM_WIDTH     = 6.00;  // [4.00:0.50:10.00] mm — UNUSED. Held for compatibility;
-                       //   the blade's height is derived from the foot geometry
-                       //   (_ARM_Z_BOT.._ARM_Z_TOP), not set independently.
-CLEARANCE     = 0.00;  // [-0.20:0.01:0.20] mm global horizontal compensation.
-                       //   Positive = looser. Your printer's elephant-foot and
-                       //   flow tuning land here. ±0.10–0.15 is the usual range.
-
-ARMS_PER_CELL = 4;     // [2, 4] one per side. 2 = opposing pair (softer insert).
-
-// Printability / structure — rarely touched, but they gate whether the arm
-// actually prints as a spring instead of a fused lump.
-ARM_UNDER_GAP   = 1.00;  // [0.40:0.05:1.50] mm air beneath the blade. The blade
-                         //   bridges this gap. Too small and first-layer droop
-                         //   welds it to the floor — killing the flexure.
-ARM_RAMP_ANGLE  = 50;    // [45:1:70] deg from horizontal, lead-in ramp. Must stay
-                         //   >45° or the ramp is an unsupported overhang and sags.
-ARM_ROOT_FILLET = 1.50;  // [0.50:0.25:3.00] mm blend length at each end where the
-                         //   blade thickens into its root. Spreads the bending
-                         //   stress that peaks at a fixed-fixed span's ends.
+PLATE_H = 4.00;   // [3.50:0.10:5.00] mm total plate height (shallow — see notes)
+FLOOR   = 1.20;   // [0.60:0.10:1.60] mm floor under the socket. Sets base rigidity;
+                  //   also anchors the catch band (FLOOR+0.8 .. FLOOR+2.6), which
+                  //   must stay within PLATE_H — raise PLATE_H if you raise FLOOR far.
+LEADIN  = 1.20;   // [0.60:0.10:2.00] mm top opening chamfer — guides the foot in
+                  //   AND clears the start of the foot's flare at the rim.
 
 // ---------------------------------------------------------------------------
-// Geometry — tangential flexure bridge
+// Latch tunables — tune against a printed tile. Watch the root-stress echo.
 // ---------------------------------------------------------------------------
-//
-// Orientation. Print is FLAT / plate-down, so layers are XY planes stacked in Z
-// and the weak direction is Z (delamination). The arm's working flex is RADIAL
-// (the foot cams each blade outward on the way in; the blade springs back under
-// the chamfer). For that flex to load the print in-plane rather than peeling
-// layers apart, the beam runs TANGENTIALLY along the wall and bows radially: the
-// radial push becomes transverse bending with axial tension staying in the layer
-// plane. A blade rooted along its BOTTOM edge would bend about a tangential axis,
-// putting tension along Z — the delamination mode the README warns about.
-//
-// Topology. A blade of free span ARM_LENGTH, rooted ONLY at its two tangential
-// ends, bowing radially at mid-span. Freedom is the whole point, so the relief
-// must hollow out everything beneath, behind, and above the span — not just
-// behind it. (An earlier revision cut only behind, leaving the blade fused to the
-// floor along its bottom edge: a three-edge-bound panel that could not spring.
-// It rendered watertight and looked correct. Probe for FREEDOM, not features.)
-//
-// Roots. A fixed-fixed span peaks its bending stress at the ends, so the blade
-// thickens outward into the relief over ARM_ROOT_FILLET at each end, blending
-// into the wall. The roots carry no protrusion — anything rigid that pokes into
-// the foot's path would block the bin from seating. Only the free span protrudes.
+ARM_ENGAGE = 0.60;  // [0.40:0.05:1.30] mm catch reach past the foot wall = the
+                    //   deflection every insertion. Drives root stress directly.
+ARM_THK    = 1.50;  // [1.00:0.10:2.40] mm tongue thickness (radial). Grip ~ thk^3,
+                    //   but root stress ~ thk — thicker grips harder AND cracks sooner.
+ARM_LEN    = 11.0;  // [6.00:0.50:16.00] mm tongue length along the wall (cantilever
+                    //   span). Longer = softer AND lower stress (~1/len^2). Safety knob.
+ARM_SLOT   = 0.90;  // [0.60:0.10:1.60] mm outboard flex gap. Must exceed ARM_ENGAGE.
+ARM_SKIN   = 0.80;  // [0.60:0.10:2.00] mm wall kept outboard of the slot.
+ARM_ROOT   = 2.00;  // [1.00:0.25:3.50] mm rooted (hinge) length — stays fused to wall.
+ARM_FILLET = 0.35;  // [0.00:0.05:0.60] mm root fillet — softens the crack-prone corner.
+CATCH_LEN  = 3.50;  // [2.00:0.50:6.00] mm length of the catch bump at the FREE end.
+                    //   Only this compliant portion protrudes; the root stays flush.
+CATCH_CHAMF= 0.60;  // [0.30:0.10:1.00] mm lead-in/out chamfer on the catch bump.
+CLEARANCE  = 0.00;  // [-0.20:0.01:0.20] mm global horizontal compensation (printer).
 
-// Local +Y frame (clickfinity_baseplate rotates copies to the other walls):
-_ARM_Y_IN  = FOOT_VERT_HW - ARM_ENGAGE + CLEARANCE;   // 18.00 — inner face, under the foot chamfer
-_ARM_Y_OUT = _ARM_Y_IN + ARM_THICKNESS;               // 19.20 — outer (flexing) face
-_ARM_Z_TOP = FOOT_VERT_Z1;                            // 3.80  — the catch shelf (top face)
-_ARM_Z_BOT = _BP_FLOOR + ARM_UNDER_GAP;               // 2.00  — blade underside; bridges the gap
-_ARM_LEAD  = _ARM_Z_BOT + ARM_ENGAGE * tan(ARM_RAMP_ANGLE);  // ramp top — kept >45° for printability
+ARMS_PER_CELL = 4;  // [2, 4] one per side. 2 = opposing pair.
 
-// Relief window bounds. y0 reaches inboard of the blade's ramp foot so nothing
-// of the socket's lower chamfer survives underneath to weld the blade down.
-_RELIEF_Y0 = _ARM_Y_IN + ARM_ENGAGE - 0.05;   // 18.55
-_RELIEF_Y1 = _ARM_Y_OUT + ARM_ENGAGE + 0.50;  // 20.30 — flex room behind, outer wall survives
-_RELIEF_Z0 = _BP_FLOOR;                       // 1.20  — floor stays intact (watertight)
-_RELIEF_Z1 = _ARM_Z_TOP + 0.50;               // 4.30  — frees the blade's top face
-
-// Blade cross-section in the (y,z) plane. Catch = the top-inner corner; below
-// _ARM_LEAD the inner face ramps outward by ARM_ENGAGE so the descending foot
-// cams the blade aside instead of butting it.
-function _blade_profile(y_in) = [
-    [y_in + ARM_ENGAGE, _ARM_Z_BOT],   // ramp foot (retracted)
-    [_ARM_Y_OUT,        _ARM_Z_BOT],
-    [_ARM_Y_OUT,        _ARM_Z_TOP],
-    [y_in,              _ARM_Z_TOP],   // the catch
-    [y_in,              _ARM_LEAD]     // ramp top
-];
-
-// Root cross-section: flush with the socket wall (no protrusion), thickened
-// outward to _RELIEF_Y1 so it fuses into the plate wall behind the relief.
-function _root_profile() = [
-    [SOCKET_HW,  _ARM_Z_BOT], [_RELIEF_Y1, _ARM_Z_BOT],
-    [_RELIEF_Y1, _ARM_Z_TOP], [SOCKET_HW,  _ARM_Z_TOP]
-];
+// Catch vertical band = the foot's vertical wall mapped into the plate.
+_CATCH_Z0 = FLOOR + 0.8;   // foot z 0.8 (top of bottom chamfer)
+_CATCH_Z1 = FLOOR + 2.6;   // foot z 2.6 (start of the flare)
+_T_IN     = FOOT_VERT_HW - ARM_ENGAGE + CLEARANCE;   // catch tip (into the cell)
+_T_OUT    = SOCK_HW + ARM_THK;                        // tongue outboard face
+_SLOT_O   = _T_OUT + ARM_SLOT;                        // outboard edge of the flex slot
+_THRU     = PLATE_H + 1;
 
 // ---------------------------------------------------------------------------
-// Insertion-force estimate — echoed at render so the tuning stays quantitative.
+// Root-stress echo — the number that predicts fracture (v3 8×1.6/0.9 hit ~67
+// MPa and snapped). Keep < ~30 MPa. sigma = 1.5·E·t·δ / L².
 // ---------------------------------------------------------------------------
-//
-// The blade is a fixed-fixed span carrying a roughly uniform radial load from
-// the foot, deflecting ARM_ENGAGE at mid-span:  k = 384·E·I / span^3.
-// Bending is radial, so I = height·thickness^3 / 12.
-//
-// Order-of-magnitude only: E is a nominal 2 GPa for PETG, the real load is not
-// perfectly uniform, and printed parts fall short of solid-material stiffness.
-// Trust the trend (thickness^3, 1/span^3), not the absolute number — and trust
-// the printed tile over both. A bin should seat with a firm push: ~15–40 N.
+_E_PETG = 2000;
+_I  = PLATE_H * pow(ARM_THK,3) / 12;
+_K  = 3 * _E_PETG * _I / pow(ARM_LEN,3);
+_F  = _K * ARM_ENGAGE;
+_SIG = 1.5 * _E_PETG * ARM_THK * ARM_ENGAGE / pow(ARM_LEN,2);
+echo(str("[clickfinity] tongue ", ARM_LEN, "x", ARM_THK, " mm -> ",
+         round(_F*10)/10, " N/arm, ", round(_F*ARMS_PER_CELL*10)/10,
+         " N/cell; root stress ~", round(_SIG*10)/10, " MPa",
+         (_SIG > 30) ? "  <<< WILL CRACK - longer ARM_LEN / thinner ARM_THK / less ARM_ENGAGE" : ""));
 
-_ARM_E_PETG = 2000;                                            // N/mm^2, nominal
-_ARM_B      = _ARM_Z_TOP - _ARM_Z_BOT;                         // blade height
-_ARM_I      = _ARM_B * pow(ARM_THICKNESS, 3) / 12;             // mm^4
-_ARM_K      = 384 * _ARM_E_PETG * _ARM_I / pow(ARM_LENGTH, 3); // N/mm
-_ARM_F      = _ARM_K * ARM_ENGAGE;                             // N per arm
-
-echo(str("[clickfinity] arm span ", ARM_LENGTH, " mm x ", ARM_THICKNESS,
-         " mm thick -> ", round(_ARM_K * 10) / 10, " N/mm; ",
-         round(_ARM_F * 10) / 10, " N per arm; ",
-         round(_ARM_F * ARMS_PER_CELL * 10) / 10, " N per cell to seat a bin",
-         (_ARM_F * ARMS_PER_CELL > 60) ? "  <<< TOO STIFF - lengthen the span" : ""));
-
-// A thin slab of the given (y,z) profile, centred at x, extruded along X.
-module _arm_slab(profile, x, t = 0.02) {
-    translate([x - t/2, 0, 0]) rotate([90, 0, 90]) linear_extrude(t) polygon(profile);
+// ---------------------------------------------------------------------------
+// Shallow baseplate
+// ---------------------------------------------------------------------------
+module _sock_cell(shrink = 0) {
+    offset(-shrink) offset(SOCK_R) offset(-SOCK_R) square(2*SOCK_HW, center = true);
 }
-
-// One tangential flexure latch at the +Y cell wall, catch facing -Y (cell centre).
-module click_arm() {
-    half  = ARM_LENGTH / 2;
-    inner = half - ARM_ROOT_FILLET;   // where the constant-section span ends
-    blade = _blade_profile(_ARM_Y_IN);
-
-    // constant-section free span
-    hull() { _arm_slab(blade, -inner); _arm_slab(blade, inner); }
-
-    for (s = [-1, 1]) {
-        // blend the blade into its root
-        hull() { _arm_slab(blade, s * inner); _arm_slab(_root_profile(), s * half); }
-        // carry the root past the relief window so it fuses into solid wall
-        hull() { _arm_slab(_root_profile(), s * half); _arm_slab(_root_profile(), s * (half + 0.6)); }
+module _socket() {
+    e = 0.01;
+    translate([0,0,FLOOR]) linear_extrude(PLATE_H - FLOOR + e) _sock_cell(0);
+    hull() {
+        translate([0,0,PLATE_H - LEADIN - e]) linear_extrude(e) _sock_cell(0);
+        translate([0,0,PLATE_H])              linear_extrude(e) _sock_cell(-LEADIN);
+    }
+}
+module _plate_slab(nx, ny) {
+    w = nx*GF; d = ny*GF;
+    linear_extrude(PLATE_H) offset(GF_FILLET) offset(-GF_FILLET) square([w,d], center = true);
+}
+module _shallow_base(nx, ny) {
+    difference() {
+        _plate_slab(nx, ny);
+        for (ix=[0:nx-1], iy=[0:ny-1])
+            translate([(ix-(nx-1)/2)*GF, (iy-(ny-1)/2)*GF, 0]) _socket();
     }
 }
 
-// The relief window. Hollows out beneath, behind, and above the blade's free
-// span so it is rooted at its two ends and nowhere else. Cut from the plate
-// before the arm is unioned back in; the plate's outer wall and floor survive,
-// so the plate stays watertight. Width is exactly ARM_LENGTH — the wall beyond
-// each end is what the roots anchor into.
-module _arm_relief() {
-    translate([0, (_RELIEF_Y0 + _RELIEF_Y1) / 2, (_RELIEF_Z0 + _RELIEF_Z1) / 2])
-        cube([ARM_LENGTH, _RELIEF_Y1 - _RELIEF_Y0, _RELIEF_Z1 - _RELIEF_Z0], center = true);
+// ---------------------------------------------------------------------------
+// Latch tongue (+Y wall; clickfinity_baseplate rotates copies to the others)
+// ---------------------------------------------------------------------------
+// Beam: full-height, flush inner face (SOCK_HW) so it never obstructs. Catch:
+// a chamfered bump on the free (-X) end only, in the vertical-wall band.
+module click_arm() {
+    // structural beam, flush inner face, rooted +X. Inner face overlaps the
+    // socket wall by a hair (0.02) so it fuses volumetrically instead of leaving
+    // a coincident plane with the already-cut socket wall.
+    translate([-ARM_LEN/2, SOCK_HW - 0.02, 0]) cube([ARM_LEN, ARM_THK + 0.02, PLATE_H]);
+    // localized catch bump on the free end (-X), protruding to _T_IN, chamfered
+    // top+bottom so it prints without an overhang and cams the foot on the way in
+    catch = [
+        [SOCK_HW, _CATCH_Z0],
+        [_T_IN,   _CATCH_Z0 + CATCH_CHAMF],
+        [_T_IN,   _CATCH_Z1 - CATCH_CHAMF],
+        [SOCK_HW, _CATCH_Z1],
+    ];
+    translate([-ARM_LEN/2, 0, 0]) rotate([90,0,90]) linear_extrude(CATCH_LEN) polygon(catch);
 }
 
-// A full baseplate: standard Gridfinity sockets, plus a latch on each cell wall.
+// Freeing cut: L-shaped, full-depth trench (outboard + free-end + base legs) so
+// the tongue is anchored only at the +X root. The base leg severs the tongue's
+// base from the socket floor — without it the tongue renders correct but is
+// glued down and can't swing.
+module _arm_relief() {
+    e = 0.02;
+    len_free = ARM_LEN - ARM_ROOT + ARM_SLOT;
+    // outboard leg (fillet the root corner via offset)
+    translate([0,0,-1]) linear_extrude(_THRU + 1)
+        offset(ARM_FILLET) offset(-ARM_FILLET)
+            translate([-ARM_LEN/2 - ARM_SLOT, _T_OUT - e])
+                square([len_free, (_SLOT_O - _T_OUT) + e]);
+    // free-end leg
+    translate([-ARM_LEN/2 - ARM_SLOT, _T_IN - 0.5, -1])
+        cube([ARM_SLOT + e, (GF/2 - ARM_SKIN) - (_T_IN - 0.5), _THRU + 1]);
+    // base leg — sever the tongue base from the socket floor along the beam's
+    // inboard face. Overlaps into the beam (0.3) and tops out at an off-feature
+    // height (z = FLOOR + 1.2) inside the socket cavity so no cut face lands
+    // coplanar with the socket floor plane.
+    translate([-ARM_LEN/2 - ARM_SLOT, SOCK_HW - 1.4, -1])
+        cube([len_free, 1.4 + 0.3, 1 + FLOOR + 1.2]);
+}
+
+module _per_wall(nx, ny) {
+    for (ix=[0:nx-1], iy=[0:ny-1])
+        translate([(ix-(nx-1)/2)*GF, (iy-(ny-1)/2)*GF, 0])
+            for (a=[0:ARMS_PER_CELL-1]) rotate([0,0,a*360/ARMS_PER_CELL]) children();
+}
 module clickfinity_baseplate(nx, ny, arms = true) {
     difference() {
-        baseplate(nx, ny);
-        if (arms)
-            for (ix = [0:nx-1], iy = [0:ny-1])
-                translate([(ix-(nx-1)/2)*GF, (iy-(ny-1)/2)*GF, 0])
-                    for (a = [0:ARMS_PER_CELL-1]) rotate([0,0,a*360/ARMS_PER_CELL]) _arm_relief();
+        union() {
+            _shallow_base(nx, ny);
+            if (arms) _per_wall(nx, ny) click_arm();
+        }
+        if (arms) _per_wall(nx, ny) _arm_relief();
     }
-    if (arms)
-        for (ix = [0:nx-1], iy = [0:ny-1])
-            translate([(ix-(nx-1)/2)*GF, (iy-(ny-1)/2)*GF, 0])
-                for (a = [0:ARMS_PER_CELL-1]) rotate([0,0,a*360/ARMS_PER_CELL]) click_arm();
 }
 
-// Plate-to-plate joiner — Phase 4 TODO. CLICKbase uses separate printed clips;
-// dovetails are the alternative. Decide once flush edges are settled.
 module connector_clip() {
     // intentionally empty until Phase 4
 }

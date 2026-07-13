@@ -12,7 +12,7 @@
 include <lib/clickfinity.scad>
 
 /* [Latch arms] */
-ENABLE_ARMS = false;  // Phase 2 — no arm geometry yet.
+ENABLE_ARMS = true;  // full-height tongue latch (see lib/clickfinity.scad)
 
 /* [Quality] */
 $fn = 48;
