@@ -47,7 +47,9 @@ SOCK_R       = 1.85;                // socket corner radius (foot corner + clear
 // Plate
 // ---------------------------------------------------------------------------
 PLATE_H = 4.00;   // [3.50:0.10:5.00] mm total plate height (shallow — see notes)
-FLOOR   = 0.80;   // [0.60:0.10:1.60] mm floor under the socket
+FLOOR   = 1.20;   // [0.60:0.10:1.60] mm floor under the socket. Sets base rigidity;
+                  //   also anchors the catch band (FLOOR+0.8 .. FLOOR+2.6), which
+                  //   must stay within PLATE_H — raise PLATE_H if you raise FLOOR far.
 LEADIN  = 1.20;   // [0.60:0.10:2.00] mm top opening chamfer — guides the foot in
                   //   AND clears the start of the foot's flare at the rim.
 
