@@ -39,11 +39,23 @@ module baseplate(nx, ny) {
 
 // ---- bin ----
 module _bin_cell(i = 0) { offset(r = -i) offset(r = BIN_R) offset(r = -BIN_R) square(BIN_SZ, center = true); }
+// Each hull's end slab sits *inside* the span it defines — `0.8-e` and
+// `BIN_BASE_H-e`, never `0.8` and `BIN_BASE_H`. Don't "tidy" the `-e` away.
+//
+// A slab that pokes e past the plane where the next solid starts duplicates
+// that solid's outer wall for e of height, and CGAL then has to split the wall
+// at z = plane + e. The split vertex is computed rather than copied, so it
+// lands ~1e-4 mm off the arc vertex it should coincide with, leaving sliver
+// triangles that read as non-manifold edges once tools/validate_stl.py rounds
+// coordinates to 4 decimals. The slivers were always there; which ($fn, nx)
+// pairs happened to collapse one into a duplicate edge was luck, which is why
+// raising $fn never helped — bin(1,1,35) failed at $fn 20/40/44/48/52/56/60
+// and 128 but passed at 64/80/96.
 module _bin_foot() {
     e = 0.01;
-    hull() { linear_extrude(e) _bin_cell(2.95); translate([0,0,0.8]) linear_extrude(e) _bin_cell(2.15); }    // bottom chamfer
+    hull() { linear_extrude(e) _bin_cell(2.95); translate([0,0,0.8-e]) linear_extrude(e) _bin_cell(2.15); }  // bottom chamfer
     translate([0,0,0.8]) linear_extrude(1.8) _bin_cell(2.15);                                                 // vertical
-    hull() { translate([0,0,2.6]) linear_extrude(e) _bin_cell(2.15); translate([0,0,BIN_BASE_H]) linear_extrude(e) _bin_cell(0); } // top chamfer
+    hull() { translate([0,0,2.6]) linear_extrude(e) _bin_cell(2.15); translate([0,0,BIN_BASE_H-e]) linear_extrude(e) _bin_cell(0); } // top chamfer
 }
 module _bin_shell(nx, ny, h, wall, floor) {
     W = nx*GF - 0.5; D = ny*GF - 0.5;
