@@ -184,23 +184,35 @@ module _per_wall(nx, ny) {
 }
 // A dovetail in the XY plane: neck (WB) at the edge, widening to WT at the tip.
 // `over` extends the base back into the plate so a male tab fuses / a female
-// slot cuts cleanly through the edge. Extruded full plate height.
-module _dovetail(wb, wt, depth, over) {
-    linear_extrude(PLATE_H + (over > 0 ? 0 : 2))
+// slot cuts cleanly through the edge. `h` is the extrude height: males take the
+// plate height, females take MORE and start below z=0 so the cut goes clean
+// through both faces — a female only as tall as the plate but sunk 1 mm leaves a
+// 1 mm roof over the slot, and the male (full plate height) then cannot enter.
+module _dovetail(wb, wt, depth, over, h = PLATE_H) {
+    linear_extrude(h)
         polygon([[-over,-wb/2], [0,-wb/2], [depth,-wt/2],
                  [depth,wt/2], [0,wb/2], [-over,wb/2]]);
 }
 // Male tabs on +X/+Y, female slots on -X/-Y. Females are the same dovetail
-// grown by JOIN_CLEAR and cut full-depth (z -1 .. PLATE_H+1).
+// grown by JOIN_CLEAR and cut clean through (z -1 .. PLATE_H+1).
 module _join_males(nx, ny) {
     ex = nx*GF/2; ey = ny*GF/2;
     for (iy=[0:ny-1]) translate([ex, (iy-(ny-1)/2)*GF, 0]) _dovetail(JOIN_WB, JOIN_WT, JOIN_DEPTH, 1);
     for (ix=[0:nx-1]) translate([(ix-(nx-1)/2)*GF, ey, 0]) rotate([0,0,90]) _dovetail(JOIN_WB, JOIN_WT, JOIN_DEPTH, 1);
 }
+// The female is the male grown by JOIN_CLEAR and sunk 0.3 mm deeper so the tab
+// bottoms on nothing. That extra depth is why the tip width can't just be
+// WT+CLEAR: widening by a fixed amount while lengthening the taper FLATTENS the
+// female's slope, so clearance shrinks with depth and goes negative near the tip
+// — the tab jams before it seats. Derive the tip width from the male's slope
+// instead, which holds JOIN_CLEAR constant along the whole flank.
+_JOIN_FD  = JOIN_DEPTH + 0.3;                                   // female depth
+_JOIN_FWB = JOIN_WB + JOIN_CLEAR;                               // female neck
+_JOIN_FWT = _JOIN_FWB + (JOIN_WT - JOIN_WB) * _JOIN_FD / JOIN_DEPTH;
 module _join_females(nx, ny) {
-    ex = nx*GF/2; ey = ny*GF/2; c = JOIN_CLEAR;
-    for (iy=[0:ny-1]) translate([-ex, (iy-(ny-1)/2)*GF, -1]) _dovetail(JOIN_WB+c, JOIN_WT+c, JOIN_DEPTH+0.3, 1);
-    for (ix=[0:nx-1]) translate([(ix-(nx-1)/2)*GF, -ey, -1]) rotate([0,0,90]) _dovetail(JOIN_WB+c, JOIN_WT+c, JOIN_DEPTH+0.3, 1);
+    ex = nx*GF/2; ey = ny*GF/2;
+    for (iy=[0:ny-1]) translate([-ex, (iy-(ny-1)/2)*GF, -1]) _dovetail(_JOIN_FWB, _JOIN_FWT, _JOIN_FD, 1, PLATE_H+2);
+    for (ix=[0:nx-1]) translate([(ix-(nx-1)/2)*GF, -ey, -1]) rotate([0,0,90]) _dovetail(_JOIN_FWB, _JOIN_FWT, _JOIN_FD, 1, PLATE_H+2);
 }
 module clickfinity_baseplate(nx, ny, arms = true) {
     difference() {
