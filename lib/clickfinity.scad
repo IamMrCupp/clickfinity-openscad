@@ -10,7 +10,8 @@
 //
 //   clickfinity_baseplate(nx, ny)  — tiled SHALLOW baseplate with latch tongues
 //   click_arm()                    — one full-height cantilever tongue
-//   connector_clip()               — plate-to-plate joiner (Phase 4 — TODO)
+//   connector_key()                — the bowtie key that joins two plates
+//                                    (set JOIN = true to cut the pockets)
 //
 // PRINT IN PETG / ABS / ASA / NYLON — **NOT PLA.** The tongues sit under
 // constant spring tension; PLA creeps and loses grip within weeks.
