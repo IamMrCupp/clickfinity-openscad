@@ -2,7 +2,21 @@
 
 A parametric, open-source generator for **magnet-free Gridfinity baseplates** — the kind that hold standard 42 mm bins with flexible latch tongues instead of magnets.
 
-> **Status: it clicks.** The generator produces a shallow baseplate whose spring tongues catch a standard Gridfinity bin foot — bin seats, holds, and releases, no magnets. Validated on a 2×2 PETG print. Grip is moderate and fully tunable; multi-plate joining (Phase 4) is still to come.
+> **Status: it clicks, and it tiles.** The generator produces a shallow baseplate whose spring tongues catch a standard Gridfinity bin foot — bin seats, holds, and releases, no magnets. Grip is moderate and fully tunable. Plates join edge-to-edge with underside bowtie keys. Both validated on PETG prints.
+
+## Joining plates
+
+Set `JOIN = true` and every edge gets the same half-pocket on its underside. Butt two plates and the halves line up into one bowtie cavity; a `connector_key()` drops in from below and neither plate can pull off it in-plane.
+
+The joint is **symmetric** — no male and female, so any edge meets any edge and there's no mating orientation to get wrong.
+
+1. Lay both plates **face-down**, butted along the shared edge.
+2. Drop a key into each cavity.
+3. Flip. The bench traps the keys — nothing to glue.
+
+Print `join_test.scad` first if you want to check `KEY_CLEAR` against your printer.
+
+Why underside rather than a dovetail cut into the plate edge: the perimeter wall is only 2.15 mm thick — 0.95 mm at the top rim once the lead-in chamfer opens up — so an edge dovetail deep enough to hold breaks through into the bin socket. The latch arm's flex slot also already occupies the middle of every wall, and would shear the root off any tab centred on a cell. The keys live in the solid wall band near the cell corners, clear of both.
 
 ## Why this exists
 
