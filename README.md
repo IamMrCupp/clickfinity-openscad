@@ -4,6 +4,18 @@ A parametric, open-source generator for **magnet-free Gridfinity baseplates** �
 
 > **Status: it clicks, and it tiles.** The generator produces a shallow baseplate whose spring tongues catch a standard Gridfinity bin foot — bin seats, holds, and releases, no magnets. Grip is moderate and fully tunable. Plates join edge-to-edge with underside bowtie keys. Both validated on PETG prints.
 
+## Get it
+
+**Just want to print something?** Grab an STL from the [latest release](../../releases/latest) — no OpenSCAD needed. Each release ships a ready-to-print baseplate, the connector keys, and the test tiles.
+
+**Want your own size?** You need [OpenSCAD](https://openscad.org/). One command, no file editing:
+
+```bash
+openscad -o plate_6x3.stl --export-format binstl -D GRID_X=6 -D GRID_Y=3 -D JOIN=true clickfinity.scad
+```
+
+**Print a test tile first.** The click is a tolerance problem and your printer isn't mine — see [Tuning](#tuning).
+
 ## Joining plates
 
 Set `JOIN = true` in `clickfinity.scad` — alongside `GRID_X`/`GRID_Y` — and every edge gets the same half-pocket on its underside. Butt two plates and the halves line up into one bowtie cavity; a `connector_key()` drops in from below and neither plate can pull off it in-plane.
@@ -34,11 +46,33 @@ Clean-room reimplementation from the published Gridfinity dimensional spec and p
 
 ## Use it
 
+Open [`clickfinity.scad`](clickfinity.scad) in OpenSCAD and use the Customizer panel, or drive it from the command line. **`-D` overrides any customizer variable**, so you never have to edit a file to try a size:
+
 ```bash
-openscad -o baseplate.stl clickfinity.scad     # grid size at the top of the file
+openscad -o build/plate_6x3.stl --export-format binstl -D GRID_X=6 -D GRID_Y=3 -D JOIN=true clickfinity.scad
 ```
 
-Grid size (`GRID_X`, `GRID_Y`) lives at the top of [`clickfinity.scad`](clickfinity.scad); every latch knob lives in [`lib/clickfinity.scad`](lib/clickfinity.scad). Both are laid out for OpenSCAD's Customizer panel. At render time the console **echoes the estimated grip force and root stress** — watch it.
+| Variable | File | What |
+|---|---|---|
+| `GRID_X`, `GRID_Y` | `clickfinity.scad` | plate size in 42 mm cells |
+| `JOIN` | `clickfinity.scad` | cut the underside pockets so plates can be joined |
+| `ENABLE_ARMS` | `clickfinity.scad` | `false` for a plain baseplate with no latches |
+| `COUNT`, `COLS` | `connector_keys.scad` | how many joiner keys to print, and bed layout |
+| latch knobs | `lib/clickfinity.scad` | `ARM_*`, `CATCH_*`, `CLEARANCE` — see [Tuning](#tuning) |
+
+A batch of sizes:
+
+```bash
+for s in 6x3 4x2 2x5; do x=${s%x*}; y=${s#*x}; openscad -o build/plate_$s.stl --export-format binstl -D GRID_X=$x -D GRID_Y=$y -D JOIN=true clickfinity.scad; done
+```
+
+Keys for a seam — *n* cells long needs **2n**:
+
+```bash
+openscad -o build/keys_x12.stl --export-format binstl -D COUNT=12 connector_keys.scad
+```
+
+At render time the console **echoes the estimated grip force and root stress** — watch it.
 
 Render and validate everything (watertight / 2-manifold, via trimesh):
 
