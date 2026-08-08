@@ -15,6 +15,15 @@ include <lib/clickfinity.scad>
 GRID_X = 4;   // [1:12]
 GRID_Y = 4;   // [1:12]
 
+/* [Edge joining] */
+// Cut the underside key pockets so this plate can be joined to another. Every
+// edge gets the same half-pocket, so plates tile in any direction and any edge
+// mates with any edge — build the bench up a plate at a time.
+//
+// Each cell edge carries TWO pockets, so a seam n cells long needs 2n keys.
+// Print them from connector_keys.scad.
+JOIN = false;
+
 /* [Latch arms] */
 ENABLE_ARMS = true;   // full-height tongue latches. Set false for a plain baseplate.
 
