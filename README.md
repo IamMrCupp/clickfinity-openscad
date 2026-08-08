@@ -6,7 +6,11 @@ A parametric, open-source generator for **magnet-free Gridfinity baseplates** �
 
 ## Joining plates
 
-Set `JOIN = true` and every edge gets the same half-pocket on its underside. Butt two plates and the halves line up into one bowtie cavity; a `connector_key()` drops in from below and neither plate can pull off it in-plane.
+Set `JOIN = true` in `clickfinity.scad` — alongside `GRID_X`/`GRID_Y` — and every edge gets the same half-pocket on its underside. Butt two plates and the halves line up into one bowtie cavity; a `connector_key()` drops in from below and neither plate can pull off it in-plane.
+
+So a 6×3 with joiners is two knobs: `GRID_X = 6`, `GRID_Y = 3`, `JOIN = true`. Print more plates later and they attach to what you already have — every edge mates, in any direction.
+
+**Keys:** each cell edge carries two pockets, so a seam *n* cells long needs **2n** keys. Joining two 6×3 plates along the 6-cell edge takes 12. Print them from `connector_keys.scad` (set `COUNT`).
 
 The joint is **symmetric** — no male and female, so any edge meets any edge and there's no mating orientation to get wrong.
 
