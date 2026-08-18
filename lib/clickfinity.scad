@@ -12,6 +12,7 @@
 //   click_arm()                    — one full-height cantilever tongue
 //   connector_key()                — the bowtie key that joins two plates
 //                                    (set JOIN = true to cut the pockets)
+//   MOUNT_HOLES = true             — countersunk screw hole at every cell centre
 //
 // PRINT IN PETG / ABS / ASA / NYLON — **NOT PLA.** The tongues sit under
 // constant spring tension; PLA creeps and loses grip within weeks.
@@ -84,6 +85,27 @@ KEY_OFF    = 13.00;  // [9.00:0.50:16.00] mm from cell centre along the edge. Mu
 KEY_CLEAR  = 0.15;   // [0.05:0.05:0.30] mm slop in the pocket — tune to print
 
 // ---------------------------------------------------------------------------
+// Mounting holes (optional) — screw the plate to a drawer or bench.
+// ---------------------------------------------------------------------------
+// One countersunk hole through the socket floor at every cell centre. The head
+// sinks into the floor from the SOCKET side, so it sits flush under the bin
+// foot's flat bottom and the bin never knows it's there. Cell centres are the
+// one place nothing else lives: the arm reliefs own the wall middles and the
+// key pockets own the perimeter edges.
+//
+// The floor is only FLOOR (1.2 mm) thick, so the head has to be small:
+//   M2 countersunk (DIN 7991): MOUNT_D 2.4, MOUNT_HEAD 3.8 → fits the default
+//      floor with ~0.3 mm of straight bore left below the cone.
+//   M3 countersunk:            MOUNT_D 3.4, MOUNT_HEAD 6.0 → cone is 1.3 mm
+//      deep; raise FLOOR to ≥1.8 AND PLATE_H to ≥4.6 (the catch band rides on
+//      FLOOR and must stay inside PLATE_H) or it breaks through the underside.
+// A render-time echo warns when the countersink leaves < 0.3 mm of floor.
+MOUNT_HOLES = false;  // cut a countersunk hole at every cell centre
+MOUNT_D     = 2.40;   // [1.60:0.10:4.00] mm through-hole (screw clearance)
+MOUNT_HEAD  = 3.80;   // [3.00:0.10:7.00] mm countersink diameter at the floor
+MOUNT_SINK  = 0.10;   // [0.00:0.05:0.50] mm head recess below the socket floor
+
+// ---------------------------------------------------------------------------
 // Latch tunables — tune against a printed tile. Watch the root-stress echo.
 // ---------------------------------------------------------------------------
 ARM_ENGAGE = 0.60;  // [0.40:0.05:1.30] mm catch reach past the foot wall = the
@@ -124,6 +146,15 @@ echo(str("[clickfinity] tongue ", ARM_LEN, "x", ARM_THK, " mm -> ",
          round(_F*10)/10, " N/arm, ", round(_F*ARMS_PER_CELL*10)/10,
          " N/cell; root stress ~", round(_SIG*10)/10, " MPa",
          (_SIG > 30) ? "  <<< WILL CRACK - longer ARM_LEN / thinner ARM_THK / less ARM_ENGAGE" : ""));
+
+// Mounting-hole floor check: 90° countersink is (head - hole)/2 deep; whatever
+// floor is left below it is the straight bore the screw actually bears on.
+_MOUNT_CONE  = (MOUNT_HEAD - MOUNT_D) / 2;
+_MOUNT_LEFT  = FLOOR - MOUNT_SINK - _MOUNT_CONE;
+if (MOUNT_HOLES)
+    echo(str("[clickfinity] mount holes ", MOUNT_D, " thru / ", MOUNT_HEAD, " csk -> ",
+             round(_MOUNT_LEFT*100)/100, " mm floor left under the head",
+             (_MOUNT_LEFT < 0.3) ? "  <<< TOO THIN - raise FLOOR (and PLATE_H) or use a smaller head" : ""));
 
 // ---------------------------------------------------------------------------
 // Shallow baseplate
@@ -241,6 +272,23 @@ module connector_key() {
     linear_extrude(KEY_H - 0.20)
         polygon([[-r,-e/2], [-r,e/2], [0,n/2], [r,e/2], [r,-e/2], [0,-n/2]]);
 }
+// One countersunk through-hole at the origin: straight bore from below the plate
+// up through the floor, and a 45° cone that opens to MOUNT_HEAD at MOUNT_SINK
+// below the socket floor. The cone keeps widening 0.02 past the floor plane so
+// its top face never lands coplanar with the socket floor (the same coincident-
+// plane sliver trap the arm relief hit — see _arm_relief).
+module _mount_hole() {
+    e = 0.02;
+    translate([0,0,-1]) cylinder(h = PLATE_H + 2, d = MOUNT_D);
+    z0 = FLOOR - MOUNT_SINK - _MOUNT_CONE;
+    translate([0,0,z0])
+        cylinder(h = _MOUNT_CONE + MOUNT_SINK + e,
+                 r1 = MOUNT_D/2, r2 = MOUNT_HEAD/2 + MOUNT_SINK + e);
+}
+module _mount_holes(nx, ny) {
+    for (ix=[0:nx-1], iy=[0:ny-1])
+        translate([(ix-(nx-1)/2)*GF, (iy-(ny-1)/2)*GF, 0]) _mount_hole();
+}
 module clickfinity_baseplate(nx, ny, arms = true) {
     difference() {
         union() {
@@ -249,6 +297,7 @@ module clickfinity_baseplate(nx, ny, arms = true) {
         }
         if (arms) _per_wall(nx, ny) _arm_relief();
         if (JOIN) _key_pockets(nx, ny);
+        if (MOUNT_HOLES) _mount_holes(nx, ny);
     }
 }
 

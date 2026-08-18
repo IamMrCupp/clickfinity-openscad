@@ -34,6 +34,18 @@ Print `join_test.scad` first if you want to check `KEY_CLEAR` against your print
 
 Why underside rather than a dovetail cut into the plate edge: the perimeter wall is only 2.15 mm thick — 0.95 mm at the top rim once the lead-in chamfer opens up — so an edge dovetail deep enough to hold breaks through into the bin socket. The latch arm's flex slot also already occupies the middle of every wall, and would shear the root off any tab centred on a cell. The keys live in the solid wall band near the cell corners, clear of both.
 
+## Mounting it down
+
+Set `MOUNT_HOLES = true` (or `-D MOUNT_HOLES=true`) and every cell gets a countersunk screw hole through its floor. The countersink opens from the *socket* side, so the screw head sits flush under the bin foot's flat bottom — the bin never touches it. Cell centres are the one spot nothing else uses: the latch reliefs own the wall middles and the key pockets own the perimeter.
+
+The floor is only 1.2 mm thick, so the head has to be small. Defaults are sized for an **M2 countersunk** screw (`MOUNT_D 2.4`, `MOUNT_HEAD 3.8`) — that leaves ~0.4 mm of straight bore under the cone. For **M3** (`MOUNT_D 3.4`, `MOUNT_HEAD 6.0`) the cone is 1.3 mm deep, so raise `FLOOR` to 1.8 and `PLATE_H` to 4.6 in `lib/clickfinity.scad`:
+
+```bash
+openscad -o build/plate_2x2_m3.stl --export-format binstl -D MOUNT_HOLES=true -D MOUNT_D=3.4 -D MOUNT_HEAD=6.0 -D FLOOR=1.8 -D PLATE_H=4.6 clickfinity.scad
+```
+
+The render echo reports how much floor is left under the head and warns when it drops below 0.3 mm. You don't have to use every hole — screw through the ones you want.
+
 ## Why this exists
 
 Gridfinity is Zack Freedman's 42 mm modular storage grid. The dominant OpenSCAD generator — kennetek's excellent [`gridfinity-rebuilt-openscad`](https://github.com/kennetek/gridfinity-rebuilt-openscad) — makes **magnet and screw baseplates only.**
@@ -57,6 +69,7 @@ openscad -o build/plate_6x3.stl --export-format binstl -D GRID_X=6 -D GRID_Y=3 -
 | `GRID_X`, `GRID_Y` | `clickfinity.scad` | plate size in 42 mm cells |
 | `JOIN` | `clickfinity.scad` | cut the underside pockets so plates can be joined |
 | `ENABLE_ARMS` | `clickfinity.scad` | `false` for a plain baseplate with no latches |
+| `MOUNT_HOLES` | `clickfinity.scad` | countersunk screw hole at every cell centre — see [Mounting](#mounting-it-down) |
 | `COUNT`, `COLS` | `connector_keys.scad` | how many joiner keys to print, and bed layout |
 | latch knobs | `lib/clickfinity.scad` | `ARM_*`, `CATCH_*`, `CLEARANCE` — see [Tuning](#tuning) |
 
